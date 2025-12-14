@@ -9,29 +9,53 @@ import re
 
 import sounddevice as sd
 import vosk
+from language_detector import detect_language
+from word_tracker import track_unknown_words
+
+
 
 # -----------------------------
 # Model paths (OFFLINE)
 # -----------------------------
 MODEL_PATHS = {
-    "en": "vosk-model-small-en-us-0.15",
-    "es": "vosk-model-small-es-0.42",
-    "hi": "vosk-model-small-hi-0.22"
+    "en": "models/vosk-model-small-en-us-0.15",
+    "es": "models/vosk-model-small-es-0.42",
+    "hi": "models/vosk-model-small-hi-0.22"
 }
+
 
 # -----------------------------
 # Load models & recognizers
 # -----------------------------
 recognizers = {}
 
-for lang, path in MODEL_PATHS.items():
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Model for '{lang}' not found.\n"
-            f"Download from: https://alphacephei.com/vosk/models"
-        )
-    model = vosk.Model(path)
-    recognizers[lang] = vosk.KaldiRecognizer(model, 16000)
+for lang, recognizer in recognizers.items():
+    if recognizer.AcceptWaveform(data):
+        result = json.loads(recognizer.Result())
+        raw_text = result.get("text", "")
+        text = clean_text(raw_text)
+
+        if not text:
+            continue
+
+        # Feature 2: Language detection
+        lang_info = detect_language(text)
+        detected_lang = lang_info.get("language", lang)
+        confidence = lang_info.get("confidence", 0.0)
+
+        # Save audio + transcript
+        audio_path = save_audio_chunk(data, detected_lang)
+        save_transcript(text, detected_lang, audio_path)
+
+        # Feature 3: Unknown word tracking
+        unknown_words = track_unknown_words(text, detected_lang)
+        if unknown_words:
+            print(f"🆕 Unknown words detected: {unknown_words}")
+
+        print(f"[{detected_lang.upper()} | conf={confidence}] {text} 🎵 {audio_path}")
+
+        break
+
 
 # -----------------------------
 # Database setup
@@ -143,15 +167,22 @@ def transcribe_loop():
                     text = clean_text(raw_text)
 
                     if not text:
-                        break
+                        continue   # ✅ skip safely
 
-                    audio_path = save_audio_chunk(data, lang)
-                    save_transcript(text, lang, audio_path)
+                    lang_info = detect_language(text)
+                    detected_lang = lang_info.get("language", lang)
+                    confidence = lang_info.get("confidence", 0.0)
 
-                    print(f"[{lang.upper()}] {text}️ 🎵 {audio_path}")
+                    audio_path = save_audio_chunk(data, detected_lang)
+                    save_transcript(text, detected_lang, audio_path)
 
-                    # IMPORTANT: stop after first success
-                    break
+                    print(
+                        f"[{detected_lang.upper()} | conf={confidence}] "
+                        f"{text} 🎵 {audio_path}"
+                    )
+
+                    break  # ✅ stop after first successful recognition
+
 
 # -----------------------------
 # Start transcriber thread
