@@ -4,11 +4,15 @@ import csv
 import io
 import os
 import transcriber
+from validator import process_unvalidated_words
+
 
 app = Flask(__name__)
 
 # Start background transcriber
 transcriber.start_transcriber()
+process_unvalidated_words()
+
 
 DB_FILE = "transcriptions.db"
 AUDIO_DIR = "audio_clips"
