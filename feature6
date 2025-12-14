@@ -1,0 +1,6 @@
+Feature 6: Database Work
+
+The system uses SQLite for local storage. Transcription data is stored
+separately from vocabulary data. The vocabulary database stores validated
+words along with detected language, meanings, usage counts, and timestamps.
+This enables offline operation and incremental learning over time.
