@@ -55,12 +55,57 @@ def store_unknown_word(word, language):
 
 def track_unknown_words(text, language):
     words = text.split()
-
     unknown_words = []
 
     for word in words:
-        if not is_known_word(word):
+        if is_known_word(word):
+            # Incremental learning: update usage count
+            update_word_usage(word)
+        else:
             store_unknown_word(word, language)
             unknown_words.append(word)
 
     return unknown_words
+
+
+def update_word_usage(word):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn.execute("""
+        UPDATE vocabulary
+        SET usage_count = usage_count + 1,
+            last_used = ?
+        WHERE word = ?
+    """, (timestamp, word))
+
+    conn.commit()
+    
+    
+def add_word_to_vocabulary(word, language, meaning):
+    """
+    Move a validated word into the vocabulary table
+    """
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn.execute("""
+        INSERT OR IGNORE INTO vocabulary
+        (word, language, meaning, usage_count, last_used)
+        VALUES (?, ?, ?, 1, ?)
+    """, (word, language, meaning, timestamp))
+
+    conn.commit()
+
+
+def remove_unvalidated_word(word):
+    """
+    Remove word from temporary unvalidated list
+    """
+    conn.execute(
+        "DELETE FROM unvalidated_words WHERE word = ?",
+        (word,)
+    )
+    conn.commit()
+
+
+
+
